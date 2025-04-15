@@ -234,11 +234,42 @@
       audioPlayer.load();
     }
 
-    function nextTrack() {
-      currentIndex = shuffle ? Math.floor(Math.random() * tracks.length) : (currentIndex + 1) % tracks.length;
-      loadTrack(currentIndex);
-      if (autoplay) audioPlayer.play();
+    let playedTracks = [];  // Array to store played tracks
+
+function nextTrack() {
+  if (shuffle) {
+    if (playedTracks.length === tracks.length) {
+      // All songs have been played, reset the played tracks
+      playedTracks = [];
     }
+
+    // Pick a random track that hasn't been played yet
+    let nextIndex;
+    do {
+      nextIndex = Math.floor(Math.random() * tracks.length);
+    } while (playedTracks.includes(nextIndex));
+
+    // Add the chosen track to the played list
+    playedTracks.push(nextIndex);
+    currentIndex = nextIndex;
+  } else {
+    // Normal behavior: go to next song
+    currentIndex = (currentIndex + 1) % tracks.length;
+  }
+
+  loadTrack(currentIndex);
+  if (autoplay) audioPlayer.play();
+}
+
+function toggleShuffle() {
+  shuffle = !shuffle;
+  shuffleStatus.textContent = shuffle ? 'On' : 'Off';
+
+  if (!shuffle) {
+    // Clear the played tracks when shuffle is turned off
+    playedTracks = [];
+  }
+}
 
     function prevTrack() {
       currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
