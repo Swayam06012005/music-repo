@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GitHub Music Player</title>
+  <style>
+    /* Add your previous styles here */
+    body {
+      font-family: sans-serif;
+      background: #0f0f0f;
+      color: #eee;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    ul { list-style: none; padding: 0; }
+    li { margin: 10px 0; }
+
+    button {
+      margin: 0.2rem;
+      padding: 0.5rem 1rem;
+      background: #222;
+      color: #1db954;
+      border: 1px solid #333;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1db954;
+      color: #111;
+    }
+
+    audio { display: none; }
+
+    canvas {
+      margin-top: 1rem;
+      width: 80%;
+      height: 100px;
+      background: #1a1a1a;
+      border-radius: 8px;
+    }
+
+    .progress-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1rem;
+      width: 80%;
+      margin-inline: auto;
+    }
+
+    .time-label {
+      font-size: 0.9rem;
+      width: 50px;
+      text-align: center;
+    }
+
+    .progress-bar {
+      flex-grow: 1;
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      position: relative;
+      cursor: pointer;
+      margin: 0 10px;
+    }
+
+    .progress {
+      height: 100%;
+      background: #1db954;
+      border-radius: 4px;
+      width: 0%;
+    }
+
+    .volume-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1rem;
+      gap: 10px;
+    }
+
+    #volumeSlider {
+      width: 150px;
+      appearance: none;
+      height: 6px;
+      background: #1db954;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    #volumeSlider::-webkit-slider-thumb {
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      border: 1px solid #000;
+    }
+
+    #muteBtn {
+      background: transparent;
+      color: #1db954;
+      font-size: 1.2rem;
+      cursor: pointer;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎵 GitHub Music Player</h1>
+
+  <div>
+    <button onclick="prevTrack()">⏮️ Prev</button>
+    <button onclick="toggleShuffle()">🔀 Shuffle: <span id="shuffleStatus">Off</span></button>
+    <button onclick="nextTrack()">⏭️ Next</button>
+    <button onclick="togglePause()">⏸️ Pause</button>
+  </div>
+
+  <ul id="trackList"></ul>
+
+  <div id="nowPlaying">Now Playing: <span id="songName">None</span></div>
+
+  <div class="progress-container">
+    <div class="time-label" id="currentTime">0:00</div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress" id="progress"></div>
+    </div>
+    <div class="time-label" id="totalTime">0:00</div>
+  </div>
+
+  <div class="volume-container">
+    <button id="muteBtn">🔊</button>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
+  </div>
+
+  <audio id="audioPlayer" controls crossorigin="anonymous"></audio>
+
+  <canvas id="visualizer"></canvas>
+
+  <script>
+    const username = "Swayam06012005"; // ← Replace with your GitHub username
+    const repo = "music-repo";       // ← Replace with your repo name
+    const folder = "Songs";
+    const branch = "main";
+
+    const apiURL = `https://api.github.com/repos/${username}/${repo}/contents/${folder}?ref=${branch}`;
+    const rawBase = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${folder}/`;
+
+    const trackListElem = document.getElementById('trackList');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const shuffleStatus = document.getElementById('shuffleStatus');
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+    const currentTimeLabel = document.getElementById('currentTime');
+    const totalTimeLabel = document.getElementById('totalTime');
+    const progressBar = document.getElementById('progressBar');
+    const progress = document.getElementById('progress');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const muteBtn = document.getElementById('muteBtn');
+    const nowPlaying = document.getElementById('songName');
+
+    let files = [], tracks = [];
+    let currentIndex = 0;
+    let shuffle = false;
+    let isPlaying = false;
+
+    fetch(apiURL)
+      .then(res => res.json())
+      .then(data => {
+        files = data;
+        tracks = data.filter(file => file.name.endsWith('.mp3') || file.name.endsWith('.wav')).map(file => file.name);
+        if (tracks.length === 0) {
+          trackListElem.innerHTML = "<li>No audio files found.</li>";
+          return;
+        }
+        renderTrackList();
+        loadTrack(currentIndex);
+      })
+      .catch(err => {
+        console.error("Failed to fetch files:", err);
+        trackListElem.innerHTML = "<li>Error loading songs.</li>";
+      });
+
+    function renderTrackList() {
+      trackListElem.innerHTML = "";
+      tracks.forEach((track, index) => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.textContent = track;
+        btn.onclick = () => {
+          currentIndex = index;
+          loadTrack(currentIndex);
+          audioPlayer.play();
+        };
+        li.appendChild(btn);
+        trackListElem.appendChild(li);
+      });
+    }
+
+    function loadTrack(index) {
+      const trackName = tracks[index];
+      audioPlayer.src = `${rawBase}${trackName}`;
+
+      nowPlaying.textContent = trackName;
+
+      audioPlayer.load();
+      audioPlayer.play();
+      isPlaying = true;
+    }
+
+    function nextTrack() {
+      currentIndex = shuffle ? Math.floor(Math.random() * tracks.length) : (currentIndex + 1) % tracks.length;
+      loadTrack(currentIndex);
+    }
+
+    function prevTrack() {
+      currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
+      loadTrack(currentIndex);
+    }
+
+    function toggleShuffle() {
+      shuffle = !shuffle;
+      shuffleStatus.textContent = shuffle ? "On" : "Off";
+    }
+
+    function togglePause() {
+      if (isPlaying) {
+        audioPlayer.pause();
+        isPlaying = false;
+      } else {
+        audioPlayer.play();
+        isPlaying = true;
+      }
+    }
+
+    audioPlayer.addEventListener('ended', nextTrack);
+
+    // 🎧 Visualizer
+    let audioCtx, analyser, source, bufferLength, dataArray;
+    audioPlayer.addEventListener('play', () => {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        source = audioCtx.createMediaElementSource(audioPlayer);
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        analyser.fftSize = 256;
+        bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+      }
+      animateVisualizer();
+    });
+
+    function animateVisualizer() {
+      requestAnimationFrame(animateVisualizer);
+      if (!analyser) return;
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const barWidth = (canvas.width / bufferLength) * 2.5;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 2;
+        const r = 100 + barHeight + (i * 2);
+        const g = 50 + i * 2;
+        const b = 200;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+      }
+    }
+
+    // ⏱ Progress Bar Logic
+    audioPlayer.addEventListener('timeupdate', updateProgress);
+    audioPlayer.addEventListener('loadedmetadata', updateProgress);
+
+    function updateProgress() {
+      const current = audioPlayer.currentTime;
+      const total = audioPlayer.duration || 0;
+
+      progress.style.width = `${(current / total) * 100}%`;
+      currentTimeLabel.textContent = formatTime(current);
+      totalTimeLabel.textContent = formatTime(total);
+    }
+
+    function formatTime(time) {
+      if (isNaN(time)) return "0:00";
+      const minutes = Math.floor(time / 60);
+      const seconds = Math.floor(time % 60).toString().padStart(2, '0');
+      return `${minutes}:${seconds}`;
+    }
+
+    // 🎯 Seek support
+    progressBar.addEventListener('click', (e) => {
+      const width = progressBar.clientWidth;
+      const clickX = e.offsetX;
+      const duration = audioPlayer.duration;
+      if (!isNaN(duration)) {
+        audioPlayer.currentTime = (clickX / width) * duration;
+      }
+    });
+
+    // 🔊 Volume control
+    volumeSlider.addEventListener('input', () => {
+      audioPlayer.volume = volumeSlider.value;
+      updateVolumeIcon();
+    });
+
+    muteBtn.addEventListener('click', () => {
+      audioPlayer.muted = !audioPlayer.muted;
+      updateVolumeIcon();
+    });
+
+    function updateVolumeIcon() {
+      if (audioPlayer.muted || audioPlayer.volume === 0) {
+        muteBtn.textContent = '🔇';
+      } else if (audioPlayer.volume < 0.5) {
+        muteBtn.textContent = '🔉';
+      } else {
+        muteBtn.textContent = '🔊';
+      }
+    }
+
+    updateVolumeIcon(); // Set initial icon
+  </script>
+</body>
+</html>
