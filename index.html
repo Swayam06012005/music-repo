@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GitHub Music Player</title>
   <style>
     body {
@@ -13,8 +13,17 @@
       padding: 2rem;
     }
 
-    ul { list-style: none; padding: 0; }
-    li { margin: 10px 0; }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 1rem auto;
+      max-width: 90%;
+      overflow-y: auto;
+    }
+
+    li {
+      margin: 10px 0;
+    }
 
     button {
       margin: 0.2rem;
@@ -31,18 +40,14 @@
       color: #111;
     }
 
-    audio { display: none; }
-
-    img.cover {
-      max-width: 250px;
-      border-radius: 16px;
-      box-shadow: 0 0 10px #000;
-      margin-top: 2rem;
+    audio {
+      display: none;
     }
 
     canvas {
       margin-top: 1rem;
-      width: 80%;
+      width: 100%;
+      max-width: 600px;
       height: 100px;
       background: #1a1a1a;
       border-radius: 8px;
@@ -53,7 +58,8 @@
       align-items: center;
       justify-content: center;
       margin-top: 1rem;
-      width: 80%;
+      width: 100%;
+      max-width: 600px;
       margin-inline: auto;
     }
 
@@ -114,15 +120,20 @@
       border: none;
     }
 
-    .hide-button {
+    #currentTrack {
+      font-size: 1.2rem;
       margin-top: 1rem;
-      background-color: #444;
-      padding: 0.5rem;
     }
 
-    .track-list {
-      max-height: 300px;
-      overflow-y: auto;
+    @media (max-width: 600px) {
+      button {
+        padding: 0.3rem 0.8rem;
+        font-size: 0.9rem;
+      }
+
+      #currentTrack {
+        font-size: 1rem;
+      }
     }
   </style>
 </head>
@@ -132,16 +143,13 @@
   <div>
     <button onclick="prevTrack()">⏮️ Prev</button>
     <button onclick="toggleShuffle()">🔀 Shuffle: <span id="shuffleStatus">Off</span></button>
-    <button onclick="nextTrack()">⏭️ Next</button>
-    <button onclick="togglePlayPause()" id="playPauseBtn">⏯️ Play</button>
-    <button class="hide-button" onclick="toggleTrackList()">🔽 Hide Track List</button>
+    <button onclick="toggleAutoplay()">▶️ Autoplay: <span id="autoplayStatus">On</span></button>
+    <button onclick="toggleList()">📂 Toggle List</button>
+    <button onclick="togglePlay()" id="playPauseBtn">⏸️ Pause</button>
   </div>
 
-  <div class="track-list" id="trackListContainer">
-    <ul id="trackList"></ul>
-  </div>
-
-  <img id="albumCover" class="cover" src="" alt="Album cover" />
+  <div id="currentTrack">🎶 Loading...</div>
+  <ul id="trackList"></ul>
 
   <div class="progress-container">
     <div class="time-label" id="currentTime">0:00</div>
@@ -157,22 +165,23 @@
   </div>
 
   <audio id="audioPlayer" controls crossorigin="anonymous"></audio>
-
   <canvas id="visualizer"></canvas>
 
   <script>
-    const username = "Swayam06012005"; // ← Replace with your GitHub username
-    const repo = "music-repo";       // ← Replace with your repo name
+    const username = "Swayam06012005";
+    const repo = "music-repo";
     const folder = "Songs";
     const branch = "main";
 
     const apiURL = `https://api.github.com/repos/${username}/${repo}/contents/${folder}?ref=${branch}`;
     const rawBase = `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${folder}/`;
 
-    const trackListElem = document.getElementById('trackList');
     const audioPlayer = document.getElementById('audioPlayer');
-    const albumCover = document.getElementById('albumCover');
+    const trackListElem = document.getElementById('trackList');
     const shuffleStatus = document.getElementById('shuffleStatus');
+    const autoplayStatus = document.getElementById('autoplayStatus');
+    const currentTrack = document.getElementById('currentTrack');
+    const playPauseBtn = document.getElementById('playPauseBtn');
     const canvas = document.getElementById('visualizer');
     const ctx = canvas.getContext('2d');
     const currentTimeLabel = document.getElementById('currentTime');
@@ -181,38 +190,34 @@
     const progress = document.getElementById('progress');
     const volumeSlider = document.getElementById('volumeSlider');
     const muteBtn = document.getElementById('muteBtn');
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const trackListContainer = document.getElementById('trackListContainer');
 
-    let files = [], tracks = [];
-    let currentIndex = 0;
-    let shuffle = false;
+    let files = [], tracks = [], currentIndex = 0, shuffle = false, autoplay = true;
 
     fetch(apiURL)
       .then(res => res.json())
       .then(data => {
         files = data;
-        tracks = data.filter(file => file.name.endsWith('.mp3') || file.name.endsWith('.wav')).map(file => file.name);
+        tracks = data.filter(f => f.name.endsWith('.mp3')).map(f => f.name);
         if (tracks.length === 0) {
-          trackListElem.innerHTML = "<li>No audio files found.</li>";
+          trackListElem.innerHTML = "<li>No songs found.</li>";
           return;
         }
         renderTrackList();
         loadTrack(currentIndex);
-      })
-      .catch(err => {
-        console.error("Failed to fetch files:", err);
-        trackListElem.innerHTML = "<li>Error loading songs.</li>";
       });
+
+    function sanitizeName(name) {
+      return name.replace(/\[SPOTDOWNLOADER\.COM\]/gi, '').replace(/\.[^/.]+$/, '').trim();
+    }
 
     function renderTrackList() {
       trackListElem.innerHTML = "";
-      tracks.forEach((track, index) => {
+      tracks.forEach((track, i) => {
         const li = document.createElement('li');
         const btn = document.createElement('button');
-        btn.textContent = track;
+        btn.textContent = sanitizeName(track);
         btn.onclick = () => {
-          currentIndex = index;
+          currentIndex = i;
           loadTrack(currentIndex);
           audioPlayer.play();
         };
@@ -224,43 +229,51 @@
     function loadTrack(index) {
       const trackName = tracks[index];
       audioPlayer.src = `${rawBase}${trackName}`;
-      audioPlayer.play();  // Autoplay the track when loaded
-
-      const baseName = trackName.replace(/\.[^/.]+$/, "");
-      const coverFile = files.find(f => f.name === `${baseName}.jpg`) || files.find(f => f.name === `default.jpg`);
-      albumCover.src = coverFile ? `${rawBase}${coverFile.name}` : "";
-
+      currentTrack.textContent = `🎶 ${sanitizeName(trackName)}`;
       audioPlayer.load();
     }
 
     function nextTrack() {
       currentIndex = shuffle ? Math.floor(Math.random() * tracks.length) : (currentIndex + 1) % tracks.length;
       loadTrack(currentIndex);
+      if (autoplay) audioPlayer.play();
     }
 
     function prevTrack() {
       currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
       loadTrack(currentIndex);
+      if (autoplay) audioPlayer.play();
     }
 
     function toggleShuffle() {
       shuffle = !shuffle;
-      shuffleStatus.textContent = shuffle ? "On" : "Off";
+      shuffleStatus.textContent = shuffle ? 'On' : 'Off';
     }
 
-    function togglePlayPause() {
+    function toggleAutoplay() {
+      autoplay = !autoplay;
+      autoplayStatus.textContent = autoplay ? 'On' : 'Off';
+    }
+
+    function toggleList() {
+      trackListElem.style.display = trackListElem.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function togglePlay() {
       if (audioPlayer.paused) {
         audioPlayer.play();
-        playPauseBtn.textContent = "⏸️ Pause";
+        playPauseBtn.textContent = '⏸️ Pause';
       } else {
         audioPlayer.pause();
-        playPauseBtn.textContent = "▶️ Play";
+        playPauseBtn.textContent = '▶️ Play';
       }
     }
 
     audioPlayer.addEventListener('ended', nextTrack);
+    audioPlayer.addEventListener('play', () => playPauseBtn.textContent = '⏸️ Pause');
+    audioPlayer.addEventListener('pause', () => playPauseBtn.textContent = '▶️ Play');
 
-    // 🎧 Visualizer
+    // Visualizer
     let audioCtx, analyser, source, bufferLength, dataArray;
     audioPlayer.addEventListener('play', () => {
       if (!audioCtx) {
@@ -280,29 +293,24 @@
       requestAnimationFrame(animateVisualizer);
       if (!analyser) return;
       analyser.getByteFrequencyData(dataArray);
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const barWidth = (canvas.width / bufferLength) * 2.5;
       let x = 0;
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = dataArray[i] / 2;
-        const r = 100 + barHeight + (i * 2);
-        const g = 50 + i * 2;
-        const b = 200;
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillStyle = `rgb(${100 + barHeight},${50 + i * 2},200)`;
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
         x += barWidth + 1;
       }
     }
 
-    // ⏱ Progress Bar Logic
+    // Time update and seek
     audioPlayer.addEventListener('timeupdate', updateProgress);
     audioPlayer.addEventListener('loadedmetadata', updateProgress);
 
     function updateProgress() {
       const current = audioPlayer.currentTime;
       const total = audioPlayer.duration || 0;
-
       progress.style.width = `${(current / total) * 100}%`;
       currentTimeLabel.textContent = formatTime(current);
       totalTimeLabel.textContent = formatTime(total);
@@ -315,28 +323,37 @@
       return `${minutes}:${seconds}`;
     }
 
-    // 🎯 Seek support
     progressBar.addEventListener('click', (e) => {
       const width = progressBar.clientWidth;
       const clickX = e.offsetX;
       const duration = audioPlayer.duration;
-      audioPlayer.currentTime = (clickX / width) * duration;
+      if (!isNaN(duration)) {
+        audioPlayer.currentTime = (clickX / width) * duration;
+      }
     });
 
-    // 🔊 Volume control
+    // Volume
     volumeSlider.addEventListener('input', () => {
       audioPlayer.volume = volumeSlider.value;
+      updateVolumeIcon();
     });
 
     muteBtn.addEventListener('click', () => {
       audioPlayer.muted = !audioPlayer.muted;
-      muteBtn.textContent = audioPlayer.muted ? "🔇" : "🔊";
+      updateVolumeIcon();
     });
 
-    // 🛑 Hide Track List
-    function toggleTrackList() {
-      trackListContainer.style.display = trackListContainer.style.display === 'none' ? 'block' : 'none';
+    function updateVolumeIcon() {
+      if (audioPlayer.muted || audioPlayer.volume === 0) {
+        muteBtn.textContent = '🔇';
+      } else if (audioPlayer.volume < 0.5) {
+        muteBtn.textContent = '🔉';
+      } else {
+        muteBtn.textContent = '🔊';
+      }
     }
+
+    updateVolumeIcon();
   </script>
 </body>
 </html>
