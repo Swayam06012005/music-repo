@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>GitHub Music Player</title>
   <style>
-    /* Add your previous styles here */
     body {
       font-family: sans-serif;
       background: #0f0f0f;
@@ -33,6 +32,13 @@
     }
 
     audio { display: none; }
+
+    img.cover {
+      max-width: 250px;
+      border-radius: 16px;
+      box-shadow: 0 0 10px #000;
+      margin-top: 2rem;
+    }
 
     canvas {
       margin-top: 1rem;
@@ -107,6 +113,17 @@
       cursor: pointer;
       border: none;
     }
+
+    .hide-button {
+      margin-top: 1rem;
+      background-color: #444;
+      padding: 0.5rem;
+    }
+
+    .track-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -116,12 +133,15 @@
     <button onclick="prevTrack()">⏮️ Prev</button>
     <button onclick="toggleShuffle()">🔀 Shuffle: <span id="shuffleStatus">Off</span></button>
     <button onclick="nextTrack()">⏭️ Next</button>
-    <button onclick="togglePause()">⏸️ Pause</button>
+    <button onclick="togglePlayPause()" id="playPauseBtn">⏯️ Play</button>
+    <button class="hide-button" onclick="toggleTrackList()">🔽 Hide Track List</button>
   </div>
 
-  <ul id="trackList"></ul>
+  <div class="track-list" id="trackListContainer">
+    <ul id="trackList"></ul>
+  </div>
 
-  <div id="nowPlaying">Now Playing: <span id="songName">None</span></div>
+  <img id="albumCover" class="cover" src="" alt="Album cover" />
 
   <div class="progress-container">
     <div class="time-label" id="currentTime">0:00</div>
@@ -151,6 +171,7 @@
 
     const trackListElem = document.getElementById('trackList');
     const audioPlayer = document.getElementById('audioPlayer');
+    const albumCover = document.getElementById('albumCover');
     const shuffleStatus = document.getElementById('shuffleStatus');
     const canvas = document.getElementById('visualizer');
     const ctx = canvas.getContext('2d');
@@ -160,12 +181,12 @@
     const progress = document.getElementById('progress');
     const volumeSlider = document.getElementById('volumeSlider');
     const muteBtn = document.getElementById('muteBtn');
-    const nowPlaying = document.getElementById('songName');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const trackListContainer = document.getElementById('trackListContainer');
 
     let files = [], tracks = [];
     let currentIndex = 0;
     let shuffle = false;
-    let isPlaying = false;
 
     fetch(apiURL)
       .then(res => res.json())
@@ -203,12 +224,13 @@
     function loadTrack(index) {
       const trackName = tracks[index];
       audioPlayer.src = `${rawBase}${trackName}`;
+      audioPlayer.play();  // Autoplay the track when loaded
 
-      nowPlaying.textContent = trackName;
+      const baseName = trackName.replace(/\.[^/.]+$/, "");
+      const coverFile = files.find(f => f.name === `${baseName}.jpg`) || files.find(f => f.name === `default.jpg`);
+      albumCover.src = coverFile ? `${rawBase}${coverFile.name}` : "";
 
       audioPlayer.load();
-      audioPlayer.play();
-      isPlaying = true;
     }
 
     function nextTrack() {
@@ -226,13 +248,13 @@
       shuffleStatus.textContent = shuffle ? "On" : "Off";
     }
 
-    function togglePause() {
-      if (isPlaying) {
-        audioPlayer.pause();
-        isPlaying = false;
-      } else {
+    function togglePlayPause() {
+      if (audioPlayer.paused) {
         audioPlayer.play();
-        isPlaying = true;
+        playPauseBtn.textContent = "⏸️ Pause";
+      } else {
+        audioPlayer.pause();
+        playPauseBtn.textContent = "▶️ Play";
       }
     }
 
@@ -298,33 +320,23 @@
       const width = progressBar.clientWidth;
       const clickX = e.offsetX;
       const duration = audioPlayer.duration;
-      if (!isNaN(duration)) {
-        audioPlayer.currentTime = (clickX / width) * duration;
-      }
+      audioPlayer.currentTime = (clickX / width) * duration;
     });
 
     // 🔊 Volume control
     volumeSlider.addEventListener('input', () => {
       audioPlayer.volume = volumeSlider.value;
-      updateVolumeIcon();
     });
 
     muteBtn.addEventListener('click', () => {
       audioPlayer.muted = !audioPlayer.muted;
-      updateVolumeIcon();
+      muteBtn.textContent = audioPlayer.muted ? "🔇" : "🔊";
     });
 
-    function updateVolumeIcon() {
-      if (audioPlayer.muted || audioPlayer.volume === 0) {
-        muteBtn.textContent = '🔇';
-      } else if (audioPlayer.volume < 0.5) {
-        muteBtn.textContent = '🔉';
-      } else {
-        muteBtn.textContent = '🔊';
-      }
+    // 🛑 Hide Track List
+    function toggleTrackList() {
+      trackListContainer.style.display = trackListContainer.style.display === 'none' ? 'block' : 'none';
     }
-
-    updateVolumeIcon(); // Set initial icon
   </script>
 </body>
 </html>
